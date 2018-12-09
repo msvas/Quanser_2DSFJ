@@ -12,24 +12,21 @@
 #include "quanser_2DSFJ.h"
 
 /*
-		IO-0 -
-    IO-1 -
-    IO-2 -
-    IO-3 -
-    IO-4 -
-    IO-5 -
-    IO-6 -
-    IO-7 -
-    IO-8 -
-    IO-9 -
-    IO-10 -
-    IO-11 -
-    IO-12 -
-    IO-13 -
-    IO-14 -
-    IO-15 -
-    IO-16 -
-
+	IO0 - GPIO - END1
+    IO1 - GPIO - END2
+    IO2 - GPIO - DIR
+    IO3 - PWM - PWM2
+    IO4 - GPIO - RST
+    IO5 - PWM - PWM1
+    IO6 - GPIO - D0
+    IO7 - GPIO - D1
+    IO8 - GPIO - D2
+    IO9 - GPIO - D3
+    IO10 - GPIO - D4
+    IO11 - GPIO - D5
+    IO12 - GPIO - D6
+    IO13 - GPIO - D7
+    IO14 - ADC - DC1
 */
 
 /** Usado para setar os bits mais significativos do contador. (COUNTHIGH = 0)*/
@@ -38,25 +35,103 @@
 //#define BYTE_SELECTED_HIGH 1
 /** Frequência máxima da galileo*/
 #define GALILEO_FREQ 1525
-/** Voltagem máxima (27V) */
+/** Tensão máxima (27V) */
 #define MOTOR_VOLTAGE 27
+/** Período do sinal de PWM */
+#define PWM_PERIOD 100
+
 /** Número máximo de ranhuras*/
-#define NUM_MARKS 4096
+//#define NUM_MARKS 4096
 /** Para conversão de unidades*/
-#define NANO 1000000000
+//#define NANO 1000000000
 
+struct PinFiles {
+	FILE *end1;
+	FILE *end2;
+	FILE *dir;
+	FILE *rst;
+	FILE *decoder_pins[8];
+}
 
+struct PwmFiles {
+	FILE *period;
+	FILE *dut_cycle;
+	FILE *enable;
+}
 
-/** Estrutura utilizada para ler os bits do contador e os sensores de fim de curso */
-struct sHandles
-{
-    /** Usado para ler os bits do contador */
-	FILE *fileBit[16];
-	/** Usado para ler o fim de curso 1 */
-	FILE *fileLim1;
-	/** Usado para ler o fim de curso 2 */
-	FILE *fileLim2;
-};
+struct AdcFiles {
+	FILE *voltage;
+	FILE *scale;
+}
+
+char readDecoder() {
+
+}
+
+void openPinFiles() {
+	// END1
+	open("/sys/class/gpio/gpio11/value", O_RDONLY);
+
+	// END2
+	open("/sys/class/gpio/gpio12/value", O_RDONLY);
+
+	// DIR
+	open("/sys/class/gpio/gpio13/value", O_WRONLY);
+
+	// PWM2
+	open("/sys/class/pwm/pwmchip0/device/pwm_period", O_WRONLY);
+	open("/sys/class/pwm/pwmchip0/pwm1/duty_cycle", O_WRONLY);
+	open("/sys/class/pwm/pwmchip0/pwm1/enable", O_WRONLY);
+
+	// RST
+	open("/sys/class/gpio/gpio6/value", O_WRONLY);
+
+	// PWM1
+	open("/sys/class/pwm/pwmchip0/pwm3/duty_cycle", O_WRONLY);
+	open("/sys/class/pwm/pwmchip0/pwm3/enable", O_WRONLY);
+
+	// D0
+	open("/sys/class/gpio/gpio1/value", O_RDONLY);
+
+	// D1
+	open("/sys/class/gpio/gpio38/value", O_RDONLY);
+
+	// D2
+	open("/sys/class/gpio/gpio40/value", O_RDONLY);
+
+	// D3
+	open("/sys/class/gpio/gpio4/value", O_RDONLY);
+
+	// D4
+	open("/sys/class/gpio/gpio10/value", O_RDONLY);
+
+	// D5
+	open("/sys/class/gpio/gpio5/value", O_RDONLY);
+
+	// D6
+	open("/sys/class/gpio/gpio15/value", O_RDONLY);
+
+	// D7
+	open("/sys/class/gpio/gpio7/value", O_RDONLY);
+
+	// DC1
+	open("/sys/bus/iio/devices/iio:device0/in_voltage0_raw", O_RDONLY);
+	open("/sys/bus/iio/devices/iio:device0/in_voltage0_scale", O_WRONLY);
+}
+
+int readLimSwitches() {
+
+}
+
+int getPWMDirection(float voltage) {
+
+}
+
+float mapPWMVoltage(float voltage) {
+	float newVoltage;
+
+	return newVoltage;
+}
 
 /** \brief Seta a ciclo de trabalho do PWM */
 void setPWMDutyCycle(int duty_cycle)
@@ -232,31 +307,6 @@ int readCounter(handles* input_values)
 	return count;
 }
 
-/** \brief Lê os valores de fim de curso*/
-int readLimitSwitches(handles *h, int num) //LER FIM DE CURSO
-{
-    /**
-    \details Lê o sensor de fim de curso representado pelo valor do parâmetro 'num'
-	\param h Estrutura do tipo 'handles' que possui os ponteiros para os arquivos utilizados para leitura
-	\param num Valor do tipo inteiro que define qual sensor será lido
-    \return Esta função retorna o valor do sensor lido, ou -1 quando o sensor não existe
-    */
-    char c;
-    rewind(h->fileLim1);
-    rewind(h->fileLim2);
-	if (num == 1)
-	{
-		c = fgetc(h->fileLim1);
- 		return atoi(&c);
-	}
-	if (num == 2)
-	{
-        c = fgetc(h->fileLim2);
-		return atoi(&c);
-	}
-
-	return -1;
-}
 /** \brief  Habilita o PWM */
 void enablePWM(void)
 {
@@ -267,6 +317,7 @@ void enablePWM(void)
     system("echo 1 > /sys/class/pwm/pwmchip0/pwm1/enable");
     setDIS(1);
 }
+
 /** \brief  Desabilita o PWM */
 void disablePWM(void)
 {
@@ -289,4 +340,11 @@ double pid(double *P_error, double *I_error, double *D_error, double *error, dou
 
 
     return 0.1 * *P_error + 0.3 * *I_error + 0.02 * *D_error;
+}
+
+int main() {
+	char decodedData;
+
+	setPWMPeriod(PWM_PERIOD);
+
 }
