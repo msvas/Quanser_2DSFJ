@@ -51,80 +51,124 @@ struct PinFiles {
 	FILE *dir;
 	FILE *rst;
 	FILE *decoder_pins[8];
-}
+};
 
 struct PwmFiles {
 	FILE *period;
-	FILE *dut_cycle;
+	FILE *duty_cycle;
 	FILE *enable;
-}
+};
 
 struct AdcFiles {
 	FILE *voltage;
 	FILE *scale;
+};
+
+struct PinFiles gpios;
+struct PwmFiles pwm1;
+struct PwmFiles pwm2;
+struct AdcFiles dc1;
+
+int getValueFromPin(FILE *file) {
+	char s;
+	int value;
+
+	fseek(file, 0, SEEK_SET);
+	fread(&s, sizeof(s), 1, file);
+
+	if (s == '1')
+		value = 1;
+	else
+		value = 0;
+
+	return value;
+}
+
+char setBit(char byte, int value, int pos) {
+	if (value)
+		byte |= 1 << pos;
+	else
+		byte &= ~(1 << pos);
+
+	return byte;
 }
 
 char readDecoder() {
+	unsigned char data_read = 0x00;
 
+	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[0]), 0);
+	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[1]), 1);
+	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[2]), 2);
+	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[3]), 3);
+	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[4]), 4);
+	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[5]), 5);
+	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[6]), 6);
+	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[7]), 7);
+
+	return data_read;
 }
 
 void openPinFiles() {
 	// END1
-	open("/sys/class/gpio/gpio11/value", O_RDONLY);
+	gpios.end1 = fopen("/sys/class/gpio/gpio11/value", "r");
 
 	// END2
-	open("/sys/class/gpio/gpio12/value", O_RDONLY);
+	gpios.end2 = fopen("/sys/class/gpio/gpio12/value", "r");
 
 	// DIR
-	open("/sys/class/gpio/gpio13/value", O_WRONLY);
+	gpios.dir = fopen("/sys/class/gpio/gpio13/value", "w");
 
 	// PWM2
-	open("/sys/class/pwm/pwmchip0/device/pwm_period", O_WRONLY);
-	open("/sys/class/pwm/pwmchip0/pwm1/duty_cycle", O_WRONLY);
-	open("/sys/class/pwm/pwmchip0/pwm1/enable", O_WRONLY);
+	pwm2.period = fopen("/sys/class/pwm/pwmchip0/device/pwm_period", "w");
+	pwm2.duty_cycle = fopen("/sys/class/pwm/pwmchip0/pwm1/duty_cycle", "w");
+	pwm2.enable = fopen("/sys/class/pwm/pwmchip0/pwm1/enable", "w");
 
 	// RST
-	open("/sys/class/gpio/gpio6/value", O_WRONLY);
+	gpios.rst = fopen("/sys/class/gpio/gpio6/value", "w");
 
 	// PWM1
-	open("/sys/class/pwm/pwmchip0/pwm3/duty_cycle", O_WRONLY);
-	open("/sys/class/pwm/pwmchip0/pwm3/enable", O_WRONLY);
+	pwm1.period = pwm2.period;
+	pwm1.duty_cycle = fopen("/sys/class/pwm/pwmchip0/pwm3/duty_cycle", "w");
+	pwm1.enable = fopen("/sys/class/pwm/pwmchip0/pwm3/enable", "w");
 
 	// D0
-	open("/sys/class/gpio/gpio1/value", O_RDONLY);
+	gpios.decoder_pins[0] = fopen("/sys/class/gpio/gpio1/value", "r");
 
 	// D1
-	open("/sys/class/gpio/gpio38/value", O_RDONLY);
+	gpios.decoder_pins[1] = fopen("/sys/class/gpio/gpio38/value", "r");
 
 	// D2
-	open("/sys/class/gpio/gpio40/value", O_RDONLY);
+	gpios.decoder_pins[2] = fopen("/sys/class/gpio/gpio40/value", "r");
 
 	// D3
-	open("/sys/class/gpio/gpio4/value", O_RDONLY);
+	gpios.decoder_pins[3] = fopen("/sys/class/gpio/gpio4/value", "r");
 
 	// D4
-	open("/sys/class/gpio/gpio10/value", O_RDONLY);
+	gpios.decoder_pins[4] = fopen("/sys/class/gpio/gpio10/value", "r");
 
 	// D5
-	open("/sys/class/gpio/gpio5/value", O_RDONLY);
+	gpios.decoder_pins[5] = fopen("/sys/class/gpio/gpio5/value", "r");
 
 	// D6
-	open("/sys/class/gpio/gpio15/value", O_RDONLY);
+	gpios.decoder_pins[6] = fopen("/sys/class/gpio/gpio15/value", "r");
 
 	// D7
-	open("/sys/class/gpio/gpio7/value", O_RDONLY);
+	gpios.decoder_pins[7] = fopen("/sys/class/gpio/gpio7/value", "r");
 
 	// DC1
-	open("/sys/bus/iio/devices/iio:device0/in_voltage0_raw", O_RDONLY);
-	open("/sys/bus/iio/devices/iio:device0/in_voltage0_scale", O_WRONLY);
-}
-
-int readLimSwitches() {
-
+	dc1.voltage = fopen("/sys/bus/iio/devices/iio:device0/in_voltage0_raw", "r");
+	dc1.scale = fopen("/sys/bus/iio/devices/iio:device0/in_voltage0_scale", "w");
 }
 
 int getPWMDirection(float voltage) {
+	int direction;
 
+	if (voltage > 2.5f)
+		direction = 1;
+	else
+		direction = 0;
+
+	return direction;
 }
 
 float mapPWMVoltage(float voltage) {
@@ -134,71 +178,20 @@ float mapPWMVoltage(float voltage) {
 }
 
 /** \brief Seta a ciclo de trabalho do PWM */
-void setPWMDutyCycle(int duty_cycle)
-{
+void setPWMDutyCycle(FILE *file, int duty_cycle) {
+	char s[20];
+
+	sprintf(s, "%d", duty_cycle);
+
+	fseek(file, 0, SEEK_SET);
+    fwrite(s, sizeof(char), sizeof(s), file);
+}
+
+/** \brief Seta a tensão do motor */
+void setMotorVoltage(double value) {
     /**
-    \details Seta a ciclo de trabalho do PWM com o valor especificado por parâmetro
-    \param duty_cycle Valor do tipo inteiro usado para definir o ciclo de trabalho do PWM
-    \return
-    */
-    char tempStringDutyCycle[100];
-    sprintf(tempStringDutyCycle, "echo %d > /sys/class/pwm/pwmchip0/pwm1/duty_cycle", duty_cycle);
-    system(tempStringDutyCycle);
-}
-
-/** \brief Seta o pino que desabilita as saídas do MOSFET driver.*/
-void setDIS(int value)
-{
-    /**
-    \details Seta o pino que desabilita as saídas do MOSFET driver.
-    \param value Valor do tipo inteiro usado para setar o pino.
-    \return Esta função não possui retorno
-    */
-
-	if(value == 0){
-	    system("echo 0 > /sys/class/gpio/gpio11/value");
-	}
-	else
-	if(value == 1){
-	    system("echo 1 > /sys/class/gpio/gpio11/value");
-	}
-}
-
-/** \brief Seta o valor do pino de reset utilizado pelos contadores. */
-void setReset(int value)
-{
-  /**
-    \details Seta o valor do pino de reset utilizado pelos contadores (value = 1 reseta, escreve 0 no valor da gpio, pois ele é negado)
-    \param value Valor do tipo inteiro usado para definir o valor do reset
-    \return Esta função não possui retorno
-    */
-    if (value == 1)
-        system("echo 0 > /sys/class/gpio/gpio6/value");
-    else
-    if (value == 0)
-        system("echo 1 > /sys/class/gpio/gpio6/value");
-
-}
-
-/** \brief Inicializa: exporta as portas da galileo e abre os arquivos necessários para leitura */
-handles *initialize(void)
-{
-	/**
-	\details Inicializa.
-    \return Estrutura com os ponteiros necessários para leitura
-    */
-	handles* temp = malloc(sizeof(handles));
-  	return temp;
-}
-
-
-
-/** \brief Seta a voltagem do motor */
-void setMotorVoltage(double value);
-{
-    /**
-    \details Seta a voltagem do motor com o valor especificado por parâmetro
-    \param value Valor do tipo inteiro usado para definir a voltagem do motor
+    \details Seta a tensão do motor com o valor especificado por parâmetro
+    \param value Valor do tipo inteiro usado para definir a tensão do motor
     \return Esta função não possui retorno
     */
 	double period = 1.0/GALILEO_FREQ * 1000000000;
@@ -208,125 +201,17 @@ void setMotorVoltage(double value);
 	if(cycle > period*0.9)
         cycle = period * 0.9;
 
-	setPWMDutyCycle(cycle);
+	setPWMDutyCycle(pwm2.duty_cycle, cycle);
 }
 
 /** \brief Seta o período do PWM */
-void setPWMPeriod(int period)
-{
-     /**
-    \details Seta a período do PWM com o valor especificado por parâmetro
-    \param period Valor do tipo inteiro usado para definir o período do PWM
-    \return
-    */
-    char tempStringPeriod[100];
-    sprintf(tempStringPeriod, "echo %d > /sys/class/pwm/pwmchip0/device/pwm_period", period);
-    system(tempStringPeriod);
-}
+void setPWMPeriod(int period) {
+	char s[20];
 
+	sprintf(s, "%d", period);
 
-/** \brief Seta sinal de enable dos contadores e do multiplexador dos contadores */
-void setENB(int cont)
-{
-    /**
-    \details Seta o sinal enable, ativando a escolha do canal de encoder a ser passado para o contador.
-                seta também os contadores.
-    \param cont Valor do tipo inteiro usado para setar o contador
-    \return Esta função não possui retorno
-    */
-	if(cont == 1){
-	    system("echo 1 > /sys/class/gpio/gpio52/value"); //ativo
-	}
-	else
-	if(cont == 0){
-	    system("echo 0 > /sys/class/gpio/gpio52/value"); //flutuando
-	}
-
-}
-
-
-/** \brief Seta os bits como mais ou menos significativos*/
-void setSEL(int value)
-{
-    /**
-    \details Seta os bits como mais ou menos significativos conforme o valor passado por parâmetro (1: mais significativos / 0: menos significativos)
-    \param value Valor do tipo inteiro usado para setar os bits (mais ou menos significativos)
-    \return Esta função não possui retorno
-    */
-
-	if(value == BYTE_SELECTED_LOW){
-        system("echo 1 > /sys/class/gpio/gpio1/value");
-	}
-	else
-	if(value == BYTE_SELECTED_HIGH){
-	    system("echo 0 > /sys/class/gpio/gpio1/value");
-	}
-}
-
-
-/** \brief Seta o valor do seletor do multiplexador.*/
-void setMUX(int value){
-    /**
-    \details Seta o valor do seletor do multiplexador, selecionando qual encoder será lido no contador.
-    \param value Valor do tipo inteiro usado para setar os bits (mais ou menos significativos)
-    \return Esta função não possui retorno
-    */
-    if(value == 0){
-        system("echo 1 > /sys/class/gpio/gpio38/value");
-	}
-	else
-	if(value == 1){
-	    system("echo 0 > /sys/class/gpio/gpio38/value");
-	}
-}
-
-
-/** \brief Lê o contador*/
-int readCounter(handles* input_values)
-{
-    /**
-    \details Lê o contador
-    \param input_values Estrutura do tipo 'handles' que possui os ponteiros para os arquivos utilizados para leitura
-    \return Esta função retorna o valor do contador
-    */
-	int i, count=0;
-	char c;
-
-	for(i=0; i<16; i++){
-
-		if (i == 0)
-            setSEL(BYTE_SELECTED_LOW);
-		else
-		if (i == 8)
-            setSEL(BYTE_SELECTED_HIGH);
-
-		rewind(input_values->fileBit[i%8]);
-		c = fgetc(input_values->fileBit[i%8]);
-		count = count + atoi(&c)*(1<<i);
-	}
-	return count;
-}
-
-/** \brief  Habilita o PWM */
-void enablePWM(void)
-{
-    /**
-    \details Habilita o PWM escrevendo 1 em /sys/class/pwm/pwmchip0/pwm1/enable
-    \return Esta função não possui retorno
-    */
-    system("echo 1 > /sys/class/pwm/pwmchip0/pwm1/enable");
-    setDIS(1);
-}
-
-/** \brief  Desabilita o PWM */
-void disablePWM(void)
-{
-    /**
-    \details Desabilita o PWM escrevendo 0 em /sys/class/pwm/pwmchip0/pwm1/enable
-    \return Esta função não possui retorno
-    */
-    system("echo 0 > /sys/class/pwm/pwmchip0/pwm1/enable");
-    setDIS(0);
+	fseek(pwm2.period, 0, SEEK_SET);
+    fwrite(s, sizeof(char), sizeof(s), pwm2.period);
 }
 
 /** \brief  Calcula o pid */
@@ -344,7 +229,17 @@ double pid(double *P_error, double *I_error, double *D_error, double *error, dou
 
 int main() {
 	char decodedData;
+	int motor_percentage;
+
+	openPinFiles();
 
 	setPWMPeriod(PWM_PERIOD);
 
+	printf("Set percentage to control motor speed and direction (0-100):");
+	scanf("%d", &motor_percentage);
+
+	setPWMDutyCycle(pwm2.duty_cycle, motor_percentage);
+
+
+	return 0;
 }
