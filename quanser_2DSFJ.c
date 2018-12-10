@@ -7,6 +7,10 @@
 
 #include <stdio.h>                  //Biblioteca de entrada e saída
 #include <stdlib.h>                 //Biblioteca de função padrão
+#include <poll.h>
+#include <signal.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include <math.h>
 #include "quanser_2DSFJ.h"
@@ -35,6 +39,8 @@
 //#define BYTE_SELECTED_HIGH 1
 /** Frequência máxima da galileo*/
 #define GALILEO_FREQ 1525
+/** Tensão lógica (5V) */
+#define GALILEO_VOLTAGE 5
 /** Tensão máxima (27V) */
 #define MOTOR_VOLTAGE 27
 /** Período do sinal de PWM */
@@ -46,35 +52,43 @@
 //#define NANO 1000000000
 
 struct PinFiles {
-	FILE *end1;
-	FILE *end2;
-	FILE *dir;
-	FILE *rst;
-	FILE *decoder_pins[8];
+	int end1;
+	int end2;
+	int dir;
+	int rst;
+	int decoder_pins[8];
 };
 
 struct PwmFiles {
-	FILE *period;
-	FILE *duty_cycle;
-	FILE *enable;
+	int period;
+	int duty_cycle;
+	int enable;
 };
 
 struct AdcFiles {
-	FILE *voltage;
-	FILE *scale;
+	int voltage;
+	int scale;
 };
 
 struct PinFiles gpios;
 struct PwmFiles pwm1;
 struct PwmFiles pwm2;
 struct AdcFiles dc1;
+struct pollfd event_end[2];
+struct sigaction act;
 
-int getValueFromPin(FILE *file) {
+static volatile int run = 1;
+
+void quit(int signal) {
+	run = 0;
+}
+
+int getPinValue(int file) {
 	char s;
 	int value;
 
-	fseek(file, 0, SEEK_SET);
-	fread(&s, sizeof(s), 1, file);
+	lseek(file, 0, SEEK_SET);
+	read(file, &s, sizeof s);
 
 	if (s == '1')
 		value = 1;
@@ -82,6 +96,15 @@ int getValueFromPin(FILE *file) {
 		value = 0;
 
 	return value;
+}
+
+void setPinValue(int file, int value) {
+	char s[20];
+
+	sprintf(s, "%d", value);
+
+	lseek(file, 0, SEEK_SET);
+	write(file, &s, sizeof s);
 }
 
 char setBit(char byte, int value, int pos) {
@@ -96,68 +119,68 @@ char setBit(char byte, int value, int pos) {
 char readDecoder() {
 	unsigned char data_read = 0x00;
 
-	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[0]), 0);
-	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[1]), 1);
-	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[2]), 2);
-	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[3]), 3);
-	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[4]), 4);
-	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[5]), 5);
-	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[6]), 6);
-	data_read = setBit(data_read, getValueFromPin(gpios.decoder_pins[7]), 7);
+	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[0]), 0);
+	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[1]), 1);
+	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[2]), 2);
+	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[3]), 3);
+	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[4]), 4);
+	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[5]), 5);
+	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[6]), 6);
+	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[7]), 7);
 
 	return data_read;
 }
 
 void openPinFiles() {
 	// END1
-	gpios.end1 = fopen("/sys/class/gpio/gpio11/value", "r");
+	gpios.end1 = open("/sys/class/gpio/gpio11/value", O_RDONLY);
 
 	// END2
-	gpios.end2 = fopen("/sys/class/gpio/gpio12/value", "r");
+	gpios.end2 = open("/sys/class/gpio/gpio12/value", O_RDONLY);
 
 	// DIR
-	gpios.dir = fopen("/sys/class/gpio/gpio13/value", "w");
+	gpios.dir = open("/sys/class/gpio/gpio13/value", O_WRONLY);
 
 	// PWM2
-	pwm2.period = fopen("/sys/class/pwm/pwmchip0/device/pwm_period", "w");
-	pwm2.duty_cycle = fopen("/sys/class/pwm/pwmchip0/pwm1/duty_cycle", "w");
-	pwm2.enable = fopen("/sys/class/pwm/pwmchip0/pwm1/enable", "w");
+	pwm2.period = open("/sys/class/pwm/pwmchip0/device/pwm_period", O_WRONLY);
+	pwm2.duty_cycle = open("/sys/class/pwm/pwmchip0/pwm1/duty_cycle", O_WRONLY);
+	pwm2.enable = open("/sys/class/pwm/pwmchip0/pwm1/enable", O_WRONLY);
 
 	// RST
-	gpios.rst = fopen("/sys/class/gpio/gpio6/value", "w");
+	gpios.rst = open("/sys/class/gpio/gpio6/value", O_WRONLY);
 
 	// PWM1
 	pwm1.period = pwm2.period;
-	pwm1.duty_cycle = fopen("/sys/class/pwm/pwmchip0/pwm3/duty_cycle", "w");
-	pwm1.enable = fopen("/sys/class/pwm/pwmchip0/pwm3/enable", "w");
+	pwm1.duty_cycle = open("/sys/class/pwm/pwmchip0/pwm3/duty_cycle", O_WRONLY);
+	pwm1.enable = open("/sys/class/pwm/pwmchip0/pwm3/enable", O_WRONLY);
 
 	// D0
-	gpios.decoder_pins[0] = fopen("/sys/class/gpio/gpio1/value", "r");
+	gpios.decoder_pins[0] = open("/sys/class/gpio/gpio1/value", O_RDONLY);
 
 	// D1
-	gpios.decoder_pins[1] = fopen("/sys/class/gpio/gpio38/value", "r");
+	gpios.decoder_pins[1] = open("/sys/class/gpio/gpio38/value", O_RDONLY);
 
 	// D2
-	gpios.decoder_pins[2] = fopen("/sys/class/gpio/gpio40/value", "r");
+	gpios.decoder_pins[2] = open("/sys/class/gpio/gpio40/value", O_RDONLY);
 
 	// D3
-	gpios.decoder_pins[3] = fopen("/sys/class/gpio/gpio4/value", "r");
+	gpios.decoder_pins[3] = open("/sys/class/gpio/gpio4/value", O_RDONLY);
 
 	// D4
-	gpios.decoder_pins[4] = fopen("/sys/class/gpio/gpio10/value", "r");
+	gpios.decoder_pins[4] = open("/sys/class/gpio/gpio10/value", O_RDONLY);
 
 	// D5
-	gpios.decoder_pins[5] = fopen("/sys/class/gpio/gpio5/value", "r");
+	gpios.decoder_pins[5] = open("/sys/class/gpio/gpio5/value", O_RDONLY);
 
 	// D6
-	gpios.decoder_pins[6] = fopen("/sys/class/gpio/gpio15/value", "r");
+	gpios.decoder_pins[6] = open("/sys/class/gpio/gpio15/value", O_RDONLY);
 
 	// D7
-	gpios.decoder_pins[7] = fopen("/sys/class/gpio/gpio7/value", "r");
+	gpios.decoder_pins[7] = open("/sys/class/gpio/gpio7/value", O_RDONLY);
 
 	// DC1
-	dc1.voltage = fopen("/sys/bus/iio/devices/iio:device0/in_voltage0_raw", "r");
-	dc1.scale = fopen("/sys/bus/iio/devices/iio:device0/in_voltage0_scale", "w");
+	dc1.voltage = open("/sys/bus/iio/devices/iio:device0/in_voltage0_raw", O_RDONLY);
+	dc1.scale = open("/sys/bus/iio/devices/iio:device0/in_voltage0_scale", O_WRONLY);
 }
 
 int getPWMDirection(float voltage) {
@@ -171,20 +194,14 @@ int getPWMDirection(float voltage) {
 	return direction;
 }
 
-float mapPWMVoltage(float voltage) {
-	float newVoltage;
-
-	return newVoltage;
-}
-
 /** \brief Seta a ciclo de trabalho do PWM */
-void setPWMDutyCycle(FILE *file, int duty_cycle) {
+void setPWMDutyCycle(int file, int duty_cycle) {
 	char s[20];
 
 	sprintf(s, "%d", duty_cycle);
 
-	fseek(file, 0, SEEK_SET);
-    fwrite(s, sizeof(char), sizeof(s), file);
+	lseek(file, 0, SEEK_SET);
+    write(file, &s, sizeof(s));
 }
 
 /** \brief Seta a tensão do motor */
@@ -210,8 +227,39 @@ void setPWMPeriod(int period) {
 
 	sprintf(s, "%d", period);
 
-	fseek(pwm2.period, 0, SEEK_SET);
-    fwrite(s, sizeof(char), sizeof(s), pwm2.period);
+	lseek(pwm2.period, 0, SEEK_SET);
+    write(pwm2.period, s, sizeof(s));
+}
+
+int reachedEnd() {
+	int reached = 0;
+
+	if (getPinValue(gpios.end1))
+		reached = 1;
+	else if (getPinValue(gpios.end2))
+		reached = 1;
+
+	return reached;
+}
+
+void interruptionsReachedEnd() {
+	unsigned char c;
+
+	event_end[0].fd = gpios.end1;
+	event_end[1].fd = gpios.end2;
+
+	/* Limpa valores */
+    read(event_end[0].fd, &c, 1);
+	read(event_end[1].fd, &c, 1);
+
+	event_end[0].events = POLLPRI;
+	event_end[1].events = POLLPRI;
+
+	act.sa_handler = quit;
+    sigaction(SIGINT, &act, NULL);
+    sigaction(SIGTERM, &act, NULL);
+
+	poll(event_end, 2, -1);
 }
 
 /** \brief  Calcula o pid */
@@ -228,8 +276,8 @@ double pid(double *P_error, double *I_error, double *D_error, double *error, dou
 }
 
 int main() {
-	char decodedData;
 	int motor_percentage;
+	int direction;
 
 	openPinFiles();
 
@@ -238,8 +286,14 @@ int main() {
 	printf("Set percentage to control motor speed and direction (0-100):");
 	scanf("%d", &motor_percentage);
 
-	setPWMDutyCycle(pwm2.duty_cycle, motor_percentage);
+	direction = getPWMDirection(GALILEO_VOLTAGE * motor_percentage * 0.01);
 
+	setPWMDutyCycle(pwm2.duty_cycle, motor_percentage);
+	setPinValue(gpios.dir, direction);
+
+	interruptionsReachedEnd();
+
+	setPWMDutyCycle(pwm2.duty_cycle, 0);
 
 	return 0;
 }

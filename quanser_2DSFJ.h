@@ -10,15 +10,18 @@
 #define quanser_2DSFJ
 
 // Assinatura das funções
-int getValueFromPin(FILE *file);
+void quit(int signal);
+int getPinValue(int file);
+void setPinValue(int file, int value);
 char setBit(char byte, int value, int pos);
 char readDecoder();
 void openPinFiles();
 int getPWMDirection(float voltage);
-float mapPWMVoltage(float voltage);
-void setPWMDutyCycle(FILE *file, int duty_cycle);
+void setPWMDutyCycle(int file, int duty_cycle);
 void setMotorVoltage(double value);
 void setPWMPeriod(int period);
+int reachedEnd();
+void interruptionsReachedEnd();
 double pid_controller(double *P_error, double *I_error, double
 *D_error, double *error, double *prevError, double setPoint, double
 processValue);
