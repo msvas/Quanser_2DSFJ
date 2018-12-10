@@ -33,23 +33,16 @@
     IO14 - ADC - DC1
 */
 
-/** Usado para setar os bits mais significativos do contador. (COUNTHIGH = 0)*/
-//#define BYTE_SELECTED_LOW 0
-/** Usado para setar os bits menos significativos do contador. (COUNTLOW = 1)*/
-//#define BYTE_SELECTED_HIGH 1
-/** Frequência máxima da galileo*/
-#define GALILEO_FREQ 1525
 /** Tensão lógica (5V) */
 #define GALILEO_VOLTAGE 5
 /** Tensão máxima (27V) */
 #define MOTOR_VOLTAGE 27
 /** Período do sinal de PWM */
-#define PWM_PERIOD 100
-
-/** Número máximo de ranhuras*/
-//#define NUM_MARKS 4096
+#define PWM_FREQ 1000
 /** Para conversão de unidades*/
-//#define NANO 1000000000
+#define NANO 1000000000
+/** Valor de radianos por contagem do encoder do motor */
+#define RADS_PER_COUNT 0.0015
 
 struct PinFiles {
 	int end1;
@@ -116,8 +109,9 @@ char setBit(char byte, int value, int pos) {
 	return byte;
 }
 
-char readDecoder() {
+int readDecoder() {
 	unsigned char data_read = 0x00;
+	int value;
 
 	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[0]), 0);
 	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[1]), 1);
@@ -128,7 +122,9 @@ char readDecoder() {
 	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[6]), 6);
 	data_read = setBit(data_read, getPinValue(gpios.decoder_pins[7]), 7);
 
-	return data_read;
+	value = data_read;
+
+	return value;
 }
 
 void openPinFiles() {
@@ -183,6 +179,14 @@ void openPinFiles() {
 	dc1.scale = open("/sys/bus/iio/devices/iio:device0/in_voltage0_scale", O_WRONLY);
 }
 
+double getEncoderData() {
+	int count;
+
+	count = readDecoder();
+
+	return RADS_PER_COUNT * count;
+}
+
 int getPWMDirection(float voltage) {
 	int direction;
 
@@ -211,9 +215,12 @@ void setMotorVoltage(double value) {
     \param value Valor do tipo inteiro usado para definir a tensão do motor
     \return Esta função não possui retorno
     */
-	double period = 1.0/GALILEO_FREQ * 1000000000;
+	double period = 1.0/PWM_FREQ * NANO;
 
-	int cycle = (int)(value/MOTOR_VOLTAGE * 0.5 * period + 0.5 * period);
+	if (value > MOTOR_VOLTAGE)
+		value = MOTOR_VOLTAGE;
+
+	int cycle = (int)(value/MOTOR_VOLTAGE * period);
 
 	if(cycle > period*0.9)
         cycle = period * 0.9;
@@ -237,6 +244,24 @@ int reachedEnd() {
 	if (getPinValue(gpios.end1))
 		reached = 1;
 	else if (getPinValue(gpios.end2))
+		reached = 1;
+
+	return reached;
+}
+
+int endLeft() {
+	int reached = 0;
+
+	if (getPinValue(gpios.end1))
+		reached = 1;
+
+	return reached;
+}
+
+int endRight() {
+	int reached = 0;
+
+	if (getPinValue(gpios.end2))
 		reached = 1;
 
 	return reached;
@@ -275,13 +300,23 @@ double pid(double *P_error, double *I_error, double *D_error, double *error, dou
     return 0.1 * *P_error + 0.3 * *I_error + 0.02 * *D_error;
 }
 
+void initialize() {
+	openPinFiles();
+	setPWMPeriod(1/PWM_FREQ * NANO);
+	setPWMDutyCycle(pwm1.duty_cycle, 0);
+	setPWMDutyCycle(pwm2.duty_cycle, 0);
+	setPinValue(pwm1.enable, 1);
+	setPinValue(pwm2.enable, 1);
+	setPinValue(gpios.rst, 1);
+	usleep(1000);
+	setPinValue(gpios.rst, 0);
+}
+
 int main() {
 	int motor_percentage;
 	int direction;
 
-	openPinFiles();
-
-	setPWMPeriod(PWM_PERIOD);
+	initialize();
 
 	printf("Set percentage to control motor speed and direction (0-100):");
 	scanf("%d", &motor_percentage);
