@@ -313,16 +313,14 @@ void interruptionsReachedEnd() {
 }
 
 /** \brief  Calcula o pid */
-double pid(double *P_error, double *I_error, double *D_error, double *error, double *prevError, double setPoint, double processValue) {
+double pid(double dt, double *P_error, double *I_error, double *D_error, double *error, double *prevError, double setPoint, double processValue) {
     *prevError = *error;
     *error = setPoint - processValue;
 
     *P_error = *error;
-    *I_error += *prevError;
-    *D_error = *error - *prevError;
-
-
-    return 0.1 * *P_error + 0.3 * *I_error + 0.02 * *D_error;
+    *I_error += *prevError * dt;
+    *D_error = (*error - *prevError) / dt;
+    return 0.1 * *P_error + 0.2 * *I_error + 0.0005 * *D_error;
 }
 
 void initialize() {
