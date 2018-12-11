@@ -1,22 +1,23 @@
-TARGET=quanser_2DSFJ
-SRCS=$(TARGET).c
-HEADER=$(TARGET).h
+TARGET=quanser_2DSFJ.a
+SRCS=quanser_2DSFJ.c
 
-FLAGS=-O2 -Wall -Iinclude -g -MMD
-INCLUDE=
+FLAGS=-O2 -Wall -MMD
+INCLUDE=-I. -I../include
 LIBDIR=
 LIBS=
 
 CC=$(CROSS_COMPILE)gcc
+CCAR=$(CROSS_COMPILE)ar
 CFLAGS=$(FLAGS) $(INCLUDE)
 LDFLAGS=$(LIBDIR) $(LIBS)
+CCARFLAGS=-crvs
 
 all: $(TARGET)
 
 $(TARGET): $(SRCS:.c=.o)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CCAR) $(CCARFLAGS) $@ $^
 
-%.o: %.c $(HEADER)
+%.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 -include $(SRCS:.c=.d)

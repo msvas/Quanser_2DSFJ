@@ -16,7 +16,7 @@ void setPinValue(int file, int value);
 char setBit(char byte, int value, int pos);
 int readDecoder();
 void openPinFiles();
-double getEncoderData();
+double getEncoderRadiansData();
 int getPWMDirection(float voltage);
 void setPWMDutyCycle(int file, int duty_cycle);
 void setMotorVoltage(double value);

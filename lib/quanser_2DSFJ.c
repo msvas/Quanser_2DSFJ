@@ -13,7 +13,7 @@
 #include <fcntl.h>
 
 #include <math.h>
-#include "quanser_2DSFJ.h"
+#include <quanser_2DSFJ.h>
 
 /*
 	IO0 - GPIO - END1
@@ -198,7 +198,7 @@ void openPinFiles() {
 		printf("Error opening dc1 scale\n");
 }
 
-double getEncoderData() {
+double getEncoderRadiansData() {
 	int count;
 
 	count = readDecoder();
@@ -337,6 +337,7 @@ void initialize() {
 	setPinValue(gpios.rst, 0);
 }
 
+/*
 int main() {
 	int motor_percentage;
 	int direction;
@@ -360,3 +361,4 @@ int main() {
 
 	return 0;
 }
+*/
