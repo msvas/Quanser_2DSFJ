@@ -129,54 +129,73 @@ int readDecoder() {
 
 void openPinFiles() {
 	// END1
-	gpios.end1 = open("/sys/class/gpio/gpio11/value", O_RDONLY);
+	if((gpios.end1 = open("/sys/class/gpio/gpio11/value", O_RDONLY)) < 0)
+		printf("Error opening end1\n");
 
 	// END2
-	gpios.end2 = open("/sys/class/gpio/gpio12/value", O_RDONLY);
+	if((gpios.end2 = open("/sys/class/gpio/gpio12/value", O_RDONLY)) < 0)
+		printf("Error opening end2\n");
 
 	// DIR
-	gpios.dir = open("/sys/class/gpio/gpio13/value", O_WRONLY);
+	if((gpios.dir = open("/sys/class/gpio/gpio13/value", O_WRONLY)) < 0)
+		printf("Error opening dir\n");
 
 	// PWM2
-	pwm2.period = open("/sys/class/pwm/pwmchip0/device/pwm_period", O_WRONLY);
-	pwm2.duty_cycle = open("/sys/class/pwm/pwmchip0/pwm1/duty_cycle", O_WRONLY);
-	pwm2.enable = open("/sys/class/pwm/pwmchip0/pwm1/enable", O_WRONLY);
+	if((pwm2.period = open("/sys/class/pwm/pwmchip0/device/pwm_period", O_WRONLY)) < 0)
+		printf("Error opening pwm period\n");
+	if((pwm2.duty_cycle = open("/sys/class/pwm/pwmchip0/pwm1/duty_cycle", O_WRONLY)) < 0)
+		printf("Error opening pwm1 duty cycle\n");
+	if((pwm2.enable = open("/sys/class/pwm/pwmchip0/pwm1/enable", O_WRONLY)) < 0)
+		printf("Error opening pwm1 enable\n");
 
 	// RST
-	gpios.rst = open("/sys/class/gpio/gpio6/value", O_WRONLY);
+	if((gpios.rst = open("/sys/class/gpio/gpio6/value", O_WRONLY)) < 0)
+		printf("Error opening rst\n");
 
 	// PWM1
 	pwm1.period = pwm2.period;
-	pwm1.duty_cycle = open("/sys/class/pwm/pwmchip0/pwm3/duty_cycle", O_WRONLY);
-	pwm1.enable = open("/sys/class/pwm/pwmchip0/pwm3/enable", O_WRONLY);
+	if((pwm1.duty_cycle = open("/sys/class/pwm/pwmchip0/pwm3/duty_cycle", O_WRONLY)) < 0)
+		printf("Error opening pwm3 duty cycle\n");
+	if((pwm1.enable = open("/sys/class/pwm/pwmchip0/pwm3/enable", O_WRONLY)) < 0)
+		printf("Error opening pwm3 enable\n");
 
 	// D0
-	gpios.decoder_pins[0] = open("/sys/class/gpio/gpio1/value", O_RDONLY);
+	if((gpios.decoder_pins[0] = open("/sys/class/gpio/gpio1/value", O_RDONLY)) < 0)
+		printf("Error opening d0\n");
 
 	// D1
-	gpios.decoder_pins[1] = open("/sys/class/gpio/gpio38/value", O_RDONLY);
+	if((gpios.decoder_pins[1] = open("/sys/class/gpio/gpio38/value", O_RDONLY)) < 0)
+		printf("Error opening d1\n");
 
 	// D2
-	gpios.decoder_pins[2] = open("/sys/class/gpio/gpio40/value", O_RDONLY);
+	if((gpios.decoder_pins[2] = open("/sys/class/gpio/gpio40/value", O_RDONLY)) < 0)
+		printf("Error opening d2\n");
 
 	// D3
-	gpios.decoder_pins[3] = open("/sys/class/gpio/gpio4/value", O_RDONLY);
+	if((gpios.decoder_pins[3] = open("/sys/class/gpio/gpio4/value", O_RDONLY)) < 0)
+		printf("Error opening d3\n");
 
 	// D4
-	gpios.decoder_pins[4] = open("/sys/class/gpio/gpio10/value", O_RDONLY);
+	if((gpios.decoder_pins[4] = open("/sys/class/gpio/gpio10/value", O_RDONLY)) < 0)
+		printf("Error opening d4\n");
 
 	// D5
-	gpios.decoder_pins[5] = open("/sys/class/gpio/gpio5/value", O_RDONLY);
+	if((gpios.decoder_pins[5] = open("/sys/class/gpio/gpio5/value", O_RDONLY)) < 0)
+		printf("Error opening d5\n");
 
 	// D6
-	gpios.decoder_pins[6] = open("/sys/class/gpio/gpio15/value", O_RDONLY);
+	if((gpios.decoder_pins[6] = open("/sys/class/gpio/gpio15/value", O_RDONLY)) < 0)
+		printf("Error opening d6\n");
 
 	// D7
-	gpios.decoder_pins[7] = open("/sys/class/gpio/gpio7/value", O_RDONLY);
+	if((gpios.decoder_pins[7] = open("/sys/class/gpio/gpio7/value", O_RDONLY)) < 0)
+		printf("Error opening d7\n");
 
 	// DC1
-	dc1.voltage = open("/sys/bus/iio/devices/iio:device0/in_voltage0_raw", O_RDONLY);
-	dc1.scale = open("/sys/bus/iio/devices/iio:device0/in_voltage0_scale", O_WRONLY);
+	if((dc1.voltage = open("/sys/bus/iio/devices/iio:device0/in_voltage0_raw", O_RDONLY)) < 0)
+		printf("Error opening dc1\n");
+	if((dc1.scale = open("/sys/bus/iio/devices/iio:device0/in_voltage0_scale", O_WRONLY)) < 0)
+		printf("Error opening dc1 scale\n");
 }
 
 double getEncoderData() {
@@ -204,6 +223,8 @@ void setPWMDutyCycle(int file, int duty_cycle) {
 
 	sprintf(s, "%d", duty_cycle);
 
+	printf("Setting pwm duty cycle to %s\n", s);
+
 	lseek(file, 0, SEEK_SET);
     write(file, &s, sizeof(s));
 }
@@ -215,16 +236,19 @@ void setMotorVoltage(double value) {
     \param value Valor do tipo inteiro usado para definir a tensão do motor
     \return Esta função não possui retorno
     */
-	double period = 1.0/PWM_FREQ * NANO;
+	int period = (1.0 / PWM_FREQ) * NANO;
 
 	if (value > MOTOR_VOLTAGE)
 		value = MOTOR_VOLTAGE;
+	if (value < 0)
+		value = 0;
 
-	int cycle = (int)(value/MOTOR_VOLTAGE * period);
+	int cycle = (int)((value / MOTOR_VOLTAGE) * period);
 
-	if(cycle > period*0.9)
-        cycle = period * 0.9;
+	//if(cycle > period*0.9)
+        //cycle = period * 0.9;
 
+	printf("Setting pwm cycle to %d, period is %d\n", cycle, period);
 	setPWMDutyCycle(pwm2.duty_cycle, cycle);
 }
 
@@ -234,6 +258,7 @@ void setPWMPeriod(int period) {
 
 	sprintf(s, "%d", period);
 
+	printf("Setting pwm period to %d\n", period);
 	lseek(pwm2.period, 0, SEEK_SET);
     write(pwm2.period, s, sizeof(s));
 }
@@ -302,7 +327,7 @@ double pid(double *P_error, double *I_error, double *D_error, double *error, dou
 
 void initialize() {
 	openPinFiles();
-	setPWMPeriod(1/PWM_FREQ * NANO);
+	setPWMPeriod((1.0 / PWM_FREQ) * NANO);
 	setPWMDutyCycle(pwm1.duty_cycle, 0);
 	setPWMDutyCycle(pwm2.duty_cycle, 0);
 	setPinValue(pwm1.enable, 1);
@@ -318,17 +343,20 @@ int main() {
 
 	initialize();
 
-	printf("Set percentage to control motor speed and direction (0-100):");
+	//direction = getPWMDirection(GALILEO_VOLTAGE * motor_percentage * 0.01);
+	setPinValue(gpios.dir, 1);
+
+	setMotorVoltage(13.5);
+
+	printf("Set voltage to control motor speed and direction (0-27):");
 	scanf("%d", &motor_percentage);
+	//setPWMDutyCycle(pwm2.duty_cycle, motor_percentage);
+	//setPinValue(gpios.dir, direction);
 
-	direction = getPWMDirection(GALILEO_VOLTAGE * motor_percentage * 0.01);
+	//interruptionsReachedEnd();
 
-	setPWMDutyCycle(pwm2.duty_cycle, motor_percentage);
-	setPinValue(gpios.dir, direction);
+	//setPWMDutyCycle(pwm2.duty_cycle, 0);
 
-	interruptionsReachedEnd();
-
-	setPWMDutyCycle(pwm2.duty_cycle, 0);
 
 	return 0;
 }
