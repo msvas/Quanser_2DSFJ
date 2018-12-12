@@ -36,7 +36,7 @@ int main(void) {
 	while(1) {
 		start_t = clock();
 		inputValue = getEncoderRadiansData();
-		if (dt_t != 0)
+		if (dt_t > 0)
 			newVoltage = pid(dt_t, &P_error, &I_error, &D_error, &error, &prevError, setPoint, inputValue);
 		if (newVoltage >   MOTOR_VOLTAGE)
 			newVoltage =   MOTOR_VOLTAGE;
