@@ -3,12 +3,6 @@
 case "$1" in
     start|restart|force-reload)
     #IO0 - GPIO - END1
-        # gpio33 = in
-    if [ ! -d /sys/class/gpio/gpio33 ] ; then
-      echo -n "33" > /sys/class/gpio/export
-    fi
-    echo -n "in" > /sys/class/gpio/gpio30/direction
-
           # gpio32 = 1 = in
     if [ ! -d /sys/class/gpio/gpio32 ] ; then
         echo -n "32" > /sys/class/gpio/export

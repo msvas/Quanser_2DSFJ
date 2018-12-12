@@ -25,9 +25,11 @@ int reachedEnd();
 int endLeft();
 int endRight();
 void interruptionsReachedEnd();
-double pid_controller(double *P_error, double *I_error, double
-*D_error, double *error, double *prevError, double setPoint, double
-processValue);
+double pid(double dt, double *P_error, double *I_error,
+            double *D_error, double *error, double *prevError,
+            double setPoint, double processValue);
+void setRst(int value);
+void setDir(int value);
 void initialize();
 
 #endif

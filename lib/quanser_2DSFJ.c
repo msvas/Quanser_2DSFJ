@@ -410,6 +410,16 @@ double pid(double dt, double *P_error, double *I_error, double *D_error, double 
     return 0.1 * *P_error + 0.2 * *I_error + 0.0005 * *D_error;
 }
 
+/** \brief  Muda o valor do reset do decoder. */
+void setRst(int value) {
+	setPinValue(gpios.rst, value);
+}
+
+/** \brief  Muda o valor da direção do PWM. */
+void setDir(int value) {
+	setPinValue(gpios.dir, value);
+}
+
 /** \brief  Inicializa os pinos com valores seguros. */
 void initialize() {
 	openPinFiles();
@@ -421,6 +431,7 @@ void initialize() {
 	setPinValue(gpios.rst, 1);
 	usleep(1000);
 	setPinValue(gpios.rst, 0);
+	usleep(1000);
 }
 
 /*

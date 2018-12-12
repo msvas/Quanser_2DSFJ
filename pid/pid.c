@@ -1,52 +1,52 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
 #include <unistd.h>
 #include <quanser_2DSFJ.h>
 
-#define KP 10
-#define KI 10
-#define KD 10
-#define SAMPLE_FREQ 1000000
+#define MOTOR_VOLTAGE 27
 
-double min(double a, double b) {
-	if (a <= b)
-		return a;
-	else
-		return b;
-}
+/* Programa de teste PID: Gira o braco ate o fim de curso para ter um lugar fixo inicial, e então gira o braco 180Cº (PI rad)*/
+int main(void) {
 
-int main() {
-	float desired_angle = 0;
-	float last_error = 0;
-	float sample_period = 1/SAMPLE_FREQ;
-	float degrees = 0;
-	double angle;
-	double error, error_area, error_speed;
-	double u;
+	// inicializacao das variaveis de controle do pid
+	double P_error 	 = 0;
+	double I_error 	 = 0;
+	double D_error 	 = 0;
+	double prevError = 0;
+	double error 	 = 0;
+	double inputValue   = 0;
+	int newVoltage   = 0;
+	double setPoint  = 6.11; // posição desejada a partir da posicao inicial
 
-	printf("Desired position (in degrees): \n");
-	scanf("%f",&degrees);
+	initialize();
 
-	desired_angle = degrees * (M_PI / 180);
+	setMotorVoltage(5.0); // o robo vai mexendo para um lado ate chegar num dos limites
+
+	while(!reachedEnd()) { }
+
+	setMotorVoltage(0); // parar motor
+
+	//Resetar contador
+	setRst(1);
+	usleep(10);
+	setRst(0);
 
 	while(1) {
-		angle = getEncoderRadiansData();
+		inputValue = getEncoderRadiansData();
+		newVoltage = pid(0.01, &P_error, &I_error, &D_error, &error, &prevError, setPoint, inputValue);
 
-		// absolute error
-		error = desired_angle - floor(angle);
+		if (newVoltage >   MOTOR_VOLTAGE)
+			newVoltage =   MOTOR_VOLTAGE;
 
-		// integration by trapezoidal rule
-		error_area = (min(error, last_error) + abs(error - last_error) / 2) * sample_period; // sample_period in nanoseconds
+		else
+			if (newVoltage < -MOTOR_VOLTAGE)
+				newVoltage = -MOTOR_VOLTAGE;
 
-		// instant speed
-		error_speed = (error - last_error) / sample_period;
+		setMotorVoltage(newVoltage);
 
-		u = KP * error + KI * error_area + KD * error_speed;
-
-		last_error = error;
-
-		setMotorVoltage(u);
-		usleep(1);
+		if(reachedEnd())
+			setMotorVoltage(0);
 	}
+
+	return 0;
+
 }
