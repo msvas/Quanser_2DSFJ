@@ -21,7 +21,7 @@ case "$1" in
         echo -n "11" > /sys/class/gpio/export
     fi
     echo -n "in" > /sys/class/gpio/gpio11/direction
-    echo -n "rising" > /sys/class/gpio/gpio11/edge
+    echo -n "falling" > /sys/class/gpio/gpio11/edge
 
     chgrp quanser /sys/class/gpio/gpio11/value
     chmod g+rw /sys/class/gpio/gpio11/value
@@ -52,7 +52,7 @@ case "$1" in
         echo -n "12" > /sys/class/gpio/export
     fi
     echo -n "in" > /sys/class/gpio/gpio12/direction
-    echo -n "rising" > /sys/class/gpio/gpio12/edge
+    echo -n "falling" > /sys/class/gpio/gpio12/edge
 
     chgrp quanser /sys/class/gpio/gpio12/value
     chmod g+rw /sys/class/gpio/gpio12/value

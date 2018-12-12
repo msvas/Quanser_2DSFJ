@@ -337,9 +337,9 @@ int reachedEnd() {
 	*/
 	int reached = 0;
 
-	if (getPinValue(gpios.end1))
+	if (!getPinValue(gpios.end1))
 		reached = 1;
-	else if (getPinValue(gpios.end2))
+	else if (!getPinValue(gpios.end2))
 		reached = 1;
 
 	return reached;
@@ -353,7 +353,7 @@ int endLeft() {
 	*/
 	int reached = 0;
 
-	if (getPinValue(gpios.end1))
+	if (!getPinValue(gpios.end1))
 		reached = 1;
 
 	return reached;
@@ -367,7 +367,7 @@ int endRight() {
 	*/
 	int reached = 0;
 
-	if (getPinValue(gpios.end2))
+	if (!getPinValue(gpios.end2))
 		reached = 1;
 
 	return reached;
