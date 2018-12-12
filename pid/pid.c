@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <quanser_2DSFJ.h>
+#include <time.h>
 
 #define MOTOR_VOLTAGE 27
 
@@ -15,6 +16,7 @@ int main(void) {
 	double error 	 = 0;
 	double inputValue   = 0;
 	int newVoltage   = 0;
+	clock_t start_t, end_t, dt_t;
 	double setPoint  = 6.11; // posição desejada a partir da posicao inicial
 
 	initialize();
@@ -29,11 +31,13 @@ int main(void) {
 	setRst(1);
 	usleep(10);
 	setRst(0);
+	dt_t = 0;
 
 	while(1) {
+		start_t = clock();
 		inputValue = getEncoderRadiansData();
-		newVoltage = pid(0.01, &P_error, &I_error, &D_error, &error, &prevError, setPoint, inputValue);
-
+		if (dt_t != 0)
+			newVoltage = pid(dt_t, &P_error, &I_error, &D_error, &error, &prevError, setPoint, inputValue);
 		if (newVoltage >   MOTOR_VOLTAGE)
 			newVoltage =   MOTOR_VOLTAGE;
 
@@ -45,6 +49,8 @@ int main(void) {
 
 		if(reachedEnd())
 			setMotorVoltage(0);
+		end_t = clock();
+		dt_t = (double)(end_t - start_t) / CLOCKS_PER_SEC;
 	}
 
 	return 0;
